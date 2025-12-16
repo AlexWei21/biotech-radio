@@ -1,0 +1,28 @@
+name: Daily BioRadio Update
+
+on:
+  schedule:
+    # Runs at 10:00 UTC everyday (approx 5:00 AM EST)
+    - cron: '0 13 * * *'
+  workflow_dispatch: # Allows you to click "Run Now" manually to test
+
+jobs:
+  update-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Update Script
+        env:
+          VAPI_API_KEY: ${{ secrets.VAPI_API_KEY }}
+          VAPI_ASSISTANT_ID: ${{ secrets.VAPI_ASSISTANT_ID }}
+        run: python daily_update.py
