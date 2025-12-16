@@ -1,43 +1,113 @@
-<script type="module">
-    // Import the library directly from a browser-friendly CDN
-    import Vapi from 'https://esm.sh/@vapi-ai/web';
-
-    // --- CONFIGURATION ---
-    const PUBLIC_KEY = "59b67b86-28d8-497d-9d84-99b5683389fc"; 
-    const ASSISTANT_ID = "23e3cfd4-e35e-4c51-8d0a-4499c5b9c78b"; 
-    // Initialize Vapi
-    const vapi = new Vapi(PUBLIC_KEY);
-
-    // --- BUTTON LOGIC ---
-    // We attach this to 'window' so your HTML button can find it
-    window.toggleVapi = function() {
-        const btn = document.getElementById("vapi-btn");
-        
-        // Check if we are already in a call
-        if (vapi.started) {
-            vapi.stop();
-            btn.innerText = "🎙️ Tap to Listen";
-            btn.style.backgroundColor = "#eef2ff"; // Reset color
-        } else {
-            btn.innerText = "Connecting...";
-            vapi.start(ASSISTANT_ID)
-                .then(() => {
-                    btn.innerText = "🔴 Stop";
-                    btn.style.backgroundColor = "#fee2e2"; // Red for active
-                })
-                .catch((err) => {
-                    console.error("Failed to connect:", err);
-                    btn.innerText = "Error (See Console)";
-                });
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BioRadio Daily</title>
+    <style>
+        /* --- VISUAL STYLES --- */
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
         }
-    };
+        h1 { margin-bottom: 20px; font-weight: 300; letter-spacing: 2px; font-size: 24px; text-transform: uppercase; color: #888;}
+        
+        #mic-btn {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+            border: 1px solid #333;
+            box-shadow: 20px 20px 60px #0f0f0f, -20px -20px 60px #1f1f1f;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        #mic-btn:active { transform: scale(0.95); }
+        
+        /* Active State (Red Ring) */
+        #mic-btn.active {
+            border: 2px solid #ff4757;
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.3);
+        }
 
-    // --- EVENT LISTENERS (Optional: For Debugging) ---
-    vapi.on('call-start', () => console.log('Call has started!'));
-    vapi.on('call-end', () => {
-        console.log('Call ended');
-        document.getElementById("vapi-btn").innerText = "🎙️ Tap to Listen";
-    });
-    vapi.on('error', (e) => console.error('Vapi Error:', e));
+        .icon { font-size: 50px; }
+        .status { margin-top: 30px; color: #555; font-size: 14px; height: 20px; }
+    </style>
+</head>
+<body>
 
-</script>
+    <h1>Biotech Radio</h1>
+
+    <div id="mic-btn">
+        <div class="icon" id="icon">🎙️</div>
+    </div>
+    
+    <div class="status" id="status-text">Tap to Listen</div>
+
+    <script type="module">
+        // 1. Import Vapi specifically for the Browser
+        import Vapi from 'https://esm.sh/@vapi-ai/web';
+
+        // --- PASTE YOUR KEYS HERE ---
+        const PUBLIC_KEY = "59b67b86-28d8-497d-9d84-99b5683389fc"; 
+        const ASSISTANT_ID = "23e3cfd4-e35e-4c51-8d0a-4499c5b9c78b"; 
+
+        const vapi = new Vapi(PUBLIC_KEY);
+        const btn = document.getElementById("mic-btn");
+        const statusText = document.getElementById("status-text");
+        const icon = document.getElementById("icon");
+        
+        let isConnected = false;
+
+        // 2. Button Click Logic
+        btn.addEventListener("click", () => {
+            if (!isConnected) {
+                statusText.innerText = "Connecting...";
+                // Start the call
+                vapi.start(ASSISTANT_ID)
+                    .catch((err) => {
+                        console.error("Connection failed:", err);
+                        statusText.innerText = "Error (Check Console)";
+                    });
+            } else {
+                // Stop the call
+                vapi.stop();
+            }
+        });
+
+        // 3. Vapi Event Listeners (Updates the UI)
+        vapi.on("call-start", () => {
+            isConnected = true;
+            btn.classList.add("active");
+            icon.innerText = "🛑";
+            statusText.innerText = "On Air";
+        });
+
+        vapi.on("call-end", () => {
+            isConnected = false;
+            btn.classList.remove("active");
+            icon.innerText = "🎙️";
+            statusText.innerText = "Tap to Listen";
+        });
+
+        vapi.on("error", (e) => {
+            console.error(e);
+            statusText.innerText = "Connection Error";
+        });
+    </script>
+</body>
+</html>
+
