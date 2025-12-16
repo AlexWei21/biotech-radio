@@ -71,6 +71,10 @@ def update_and_call_everyone(news_text):
     5.  Go through every headline and provide proper amount of details.
     6.  Add "That's all for today's biotech news, thanks!" at the end.
 
+    ### YOUR MODES:
+    1.  **NEWS MODE (Default):** Read the headlines and summaries below. Use a slow, authoritative BBC-style voice. Use ellipses ("...") for pauses.
+    2.  **Q&A MODE (If interrupted):** If the user asks a question (e.g., "What is CAR-T?"), stop reading the news. Answer the definition clearly and briefly (2-3 sentences max). Then ask: "Shall I continue with the news?"
+
     ### TODAY'S CONTENT:
     {news_text}
     """
@@ -79,7 +83,7 @@ def update_and_call_everyone(news_text):
     payload_update = {
         "model": {
             "provider": "openai",
-            "model": "gpt-4o",
+            "model": "gpt-4o-mini",
             "messages": [{"role": "system", "content": system_instruction}]
         }
     }
