@@ -2,7 +2,7 @@ name: Daily BioRadio Update
 
 on:
   schedule:
-    # Runs at 10:00 UTC everyday (approx 5:00 AM EST)
+    # Runs at 13:00 UTC everyday
     - cron: '0 13 * * *'
   workflow_dispatch: # Allows you to click "Run Now" manually to test
 
@@ -23,6 +23,10 @@ jobs:
 
       - name: Run Update Script
         env:
+          # --- THESE WERE MISSING ---
+          VAPI_PHONE_NUMBER_ID: ${{ secrets.VAPI_PHONE_NUMBER_ID }}
+          MY_PHONE_NUMBER: ${{ secrets.MY_PHONE_NUMBER }}
+          # --------------------------
           VAPI_API_KEY: ${{ secrets.VAPI_API_KEY }}
           VAPI_ASSISTANT_ID: ${{ secrets.VAPI_ASSISTANT_ID }}
         run: python daily_update.py
