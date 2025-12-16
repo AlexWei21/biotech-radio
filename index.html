@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BioRadio Daily</title>
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web/dist/vapi.min.js"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevents scrolling */
+        }
+        h1 { margin-bottom: 20px; font-weight: 300; letter-spacing: 2px; font-size: 24px; text-transform: uppercase; color: #888;}
+        
+        #mic-btn {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+            border: 1px solid #333;
+            box-shadow: 20px 20px 60px #0f0f0f, -20px -20px 60px #1f1f1f;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent; /* Removes blue highlight on tap */
+        }
+        
+        #mic-btn:active { transform: scale(0.95); }
+        
+        #mic-btn.active {
+            border: 2px solid #ff4757;
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.3);
+        }
+
+        .icon { font-size: 50px; }
+        .status { margin-top: 30px; color: #555; font-size: 14px; height: 20px; }
+    </style>
+</head>
+<body>
+
+    <h1>Biotech Radio</h1>
+
+    <div id="mic-btn">
+        <div class="icon" id="icon">🎙️</div>
+    </div>
+    <div class="status" id="status-text">Tap to Listen</div>
+
+    <script>
+        // --- PUT YOUR KEYS HERE ---
+        const PUBLIC_KEY = "YOUR_PUBLIC_KEY_HERE"; 
+        const ASSISTANT_ID = "YOUR_ASSISTANT_ID_HERE"; 
+
+        const vapi = new Vapi(PUBLIC_KEY);
+        const btn = document.getElementById("mic-btn");
+        const statusText = document.getElementById("status-text");
+        const icon = document.getElementById("icon");
+        let isConnected = false;
+
+        btn.addEventListener("click", () => {
+            if (!isConnected) {
+                statusText.innerText = "Connecting to Studio...";
+                vapi.start(ASSISTANT_ID);
+            } else {
+                vapi.stop();
+            }
+        });
+
+        vapi.on("call-start", () => {
+            isConnected = true;
+            btn.classList.add("active");
+            icon.innerText = "🛑";
+            statusText.innerText = "On Air";
+        });
+
+        vapi.on("call-end", () => {
+            isConnected = false;
+            btn.classList.remove("active");
+            icon.innerText = "🎙️";
+            statusText.innerText = "Tap to Listen";
+        });
+    </script>
+</body>
+</html>

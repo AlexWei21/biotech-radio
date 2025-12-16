@@ -68,7 +68,7 @@ def update_vapi_agent(news_text):
     date_str = datetime.datetime.now().strftime("%B %d, %Y")
 
     system_instruction = f"""
-    You are 'BioRadio', the daily biotech news anchor.
+    You are 'BioRadio', the daily biotech news anchor. Speak at a slow, deliberate pace.
     Today is {date_str}.
     
     ### INSTRUCTIONS:
