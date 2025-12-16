@@ -1,121 +1,127 @@
 import os
 import requests
-import feedparser
 from bs4 import BeautifulSoup
 import datetime
+import re
 
 # --- CONFIGURATION ---
-# We use Environment Variables for security (set these in GitHub later)
 VAPI_API_KEY = os.environ.get("VAPI_API_KEY")
 VAPI_ASSISTANT_ID = os.environ.get("VAPI_ASSISTANT_ID")
-RSS_URL = "https://www.fiercebiotech.com/rss/fiercebiotech"
+BASE_URL = "https://www.fiercebiotech.com"
 
-def scrape_article_text(url):
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+}
+
+def get_article_links():
     """
-    Visits the article link and extracts the main text.
+    Scrapes the homepage for the latest article URLs.
     """
+    print(f"Scanning {BASE_URL} for news...")
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(BASE_URL, headers=headers, timeout=10)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # FierceBiotech: Main text is usually in 'field-name-body' or 'content__body'
-        body = soup.find('div', class_='field-name-body')
-        if not body:
-            body = soup.find('div', class_='content__body')
-        if not body:
-            # Fallback: Try to find any article tag
-            body = soup.find('article')
-
-        if body:
-            # Get text, strip extra whitespace
-            text = body.get_text(separator=" ").strip()
-            # Clean up: Remove generic footers if present
-            text = text.replace("© 2025 Questex LLC", "")
-            return " ".join(text.split())[:2000] # Limit to 2000 chars per article
-            
-        return "Content extraction failed. Please refer to the headline."
+        links = []
+        # Strategy: Find all links that look like news articles
+        # FierceBiotech usually puts articles in /biotech/ or /research/ paths
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            # Filter for valid article paths (exclude jobs, events, generic pages)
+            if '/biotech/' in href or '/research/' in href or '/medtech/' in href:
+                # Ensure full URL
+                full_url = href if href.startswith('http') else f"{BASE_URL}{href}"
+                
+                # Avoid duplicates and non-article pages (like category pages)
+                if full_url not in links and len(full_url) > 40:
+                    links.append(full_url)
+        
+        # Return top 5 unique links (homepage usually orders by latest)
+        return links[:5]
     except Exception as e:
-        print(f"Error scraping {url}: {e}")
-        return "Could not load article details."
+        print(f"Error scanning homepage: {e}")
+        return []
 
-def get_todays_news():
+def scrape_article_content(url):
     """
-    Parses RSS and formats the System Prompt.
+    Visits a specific article URL and extracts the body text.
     """
-    print("Fetching RSS Feed...")
-    feed = feedparser.parse(RSS_URL)
-    
-    news_content = []
-    current_date = datetime.datetime.now().strftime("%B %d, %Y")
-    
-    # Process top 4 articles only (to keep context window manageable)
-    for i, entry in enumerate(feed.entries[:4]):
-        print(f"Processing ({i+1}/4): {entry.title}")
-        details = scrape_article_text(entry.link)
-        
-        article_block = (
-            f"STORY {i+1}: {entry.title}\n"
-            f"DETAILS: {details}\n"
-            "-----------------------------\n"
-        )
-        news_content.append(article_block)
-        
-    final_text = "\n".join(news_content)
-    
-    return current_date, final_text
+    try:
+        print(f"Scraping: {url}")
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content, 'html.parser')
 
-def update_vapi(date_str, news_text):
-    """
-    Patches the Vapi Assistant with the new System Prompt.
-    """
+        # 1. Get Title
+        title_tag = soup.find('h1')
+        title = title_tag.get_text().strip() if title_tag else "Unknown Headline"
+
+        # 2. Get Body
+        # FierceBiotech uses various classes; we try the most common ones.
+        article_body = soup.find('div', class_='field-name-body') or \
+                       soup.find('div', class_='content__body') or \
+                       soup.find('article')
+        
+        if article_body:
+            # Get text and clean it
+            text = article_body.get_text(separator=" ").strip()
+            # Remove "junk" text often found in footers/sidebars
+            text = re.sub(r'\s+', ' ', text) # Collapse multiple spaces
+            return title, text[:2500] # Limit to 2500 chars
+            
+        return title, "Content could not be extracted."
+        
+    except Exception as e:
+        print(f"Failed to scrape {url}: {e}")
+        return None, None
+
+def update_vapi_agent(news_text):
     url = f"https://api.vapi.ai/assistant/{VAPI_ASSISTANT_ID}"
-    
-    # This is the "Persona" prompt + The Dynamic News
+    date_str = datetime.datetime.now().strftime("%B %d, %Y")
+
     system_instruction = f"""
-    You are 'BioRadio', an intelligent, professional biotech news anchor.
-    Today's date is {date_str}.
-
+    You are 'BioRadio', the daily biotech news anchor.
+    Today is {date_str}.
+    
     ### INSTRUCTIONS:
-    1.  **Opening:** Start by welcoming the user to the 'Daily Biotech Briefing' and state today's date clearly.
-    2.  **Headlines:** Read the headlines of the top stories first.
-    3.  **Interaction:** If the user listens silently, pick the most important story and summarize the technical details (Mechanism of Action, Phase data, etc.).
-    4.  **Q&A:** If the user interrupts with questions like "What was the p-value?" or "Who led the round?", look at the DETAILS section below to answer.
-    5.  **Style:** Speak like a radio host (NPR/Bloomberg style). Do not read URLs. Do not say "Story 1" or "End of details".
-
-    ### TODAY'S NEWS DATA:
+    1. INTRO: Say "Good morning, here is your Fierce Biotech Daily Briefing."
+    2. CONTENT: Use the provided news below. Summarize the top stories.
+    3. STYLE: Professional, fast-paced, insightful.
+    4. INTERACTIVE: If the user asks a technical question (e.g. "What's the p-value?"), answer it using the details provided.
+    
+    ### TODAY'S NEWS:
     {news_text}
     """
 
-    # Vapi API Payload Structure
-    payload = {
-        "model": {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": system_instruction
-                }
-            ]
-        }
-    }
+    payload = { "model": { "messages": [ { "role": "system", "content": system_instruction } ] } }
     
-    headers = {
-        "Authorization": f"Bearer {VAPI_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    # Check if keys are present (for local testing)
+    if not VAPI_API_KEY or not VAPI_ASSISTANT_ID:
+        print("❌ Missing API Keys. Export VAPI_API_KEY and VAPI_ASSISTANT_ID.")
+        return
+
+    resp = requests.patch(url, json=payload, headers={"Authorization": f"Bearer {VAPI_API_KEY}", "Content-Type": "application/json"})
     
-    print("Pushing update to Vapi...")
-    response = requests.patch(url, json=payload, headers=headers)
-    
-    if response.status_code == 200:
-        print("✅ Vapi Assistant Updated Successfully!")
+    if resp.status_code == 200:
+        print("✅ Vapi updated successfully.")
     else:
-        print(f"❌ Error updating Vapi: {response.status_code} - {response.text}")
-        exit(1) # Fail the GitHub Action if Vapi update fails
+        print(f"❌ Vapi update failed: {resp.text}")
 
 if __name__ == "__main__":
-    date, news = get_todays_news()
-    if news:
-        update_vapi(date, news)
+    links = get_article_links()
+    
+    if not links:
+        print("No links found on homepage.")
+        exit()
+
+    full_briefing = []
+    
+    for link in links:
+        title, content = scrape_article_content(link)
+        if title and content:
+            full_briefing.append(f"HEADLINE: {title}\nDETAILS: {content}\n----------------\n")
+
+    if full_briefing:
+        final_text = "\n".join(full_briefing)
+        update_vapi_agent(final_text)
     else:
-        print("No news found today.")
+        print("No articles successfully scraped.")
