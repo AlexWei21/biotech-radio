@@ -84,6 +84,8 @@ def update_and_call_everyone(news_text):
         "model": {
             "provider": "openai",
             "model": "gpt-4o-mini",
+            "maxTokens": 2000, 
+            "temperature": 0.1,
             "messages": [{"role": "system", "content": system_instruction}]
         }
     }
