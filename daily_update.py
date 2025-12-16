@@ -8,7 +8,7 @@ import time
 
 # --- CONFIGURATION ---
 # 1. THE SWITCH (Change this to True or False)
-ENABLE_CALLS = False  # <--- SET TO FALSE IF YOU JUST WANT TO UPDATE THE WEBSITE
+ENABLE_CALLS = True  # <--- SET TO FALSE IF YOU JUST WANT TO UPDATE THE WEBSITE
 
 # 2. API KEYS & SECRETS
 VAPI_API_KEY = os.environ.get("VAPI_API_KEY")
@@ -85,7 +85,7 @@ def update_and_call_everyone(news_text):
             "provider": "openai",
             "model": "gpt-4o-mini",
             "maxTokens": 2000, 
-            "temperature": 0.1,
+            "temperature": 0.5,
             "messages": [{"role": "system", "content": system_instruction}]
         }
     }
