@@ -7,10 +7,14 @@ import requests
 import time
 
 # --- CONFIGURATION ---
+# 1. THE SWITCH (Change this to True or False)
+ENABLE_CALLS = False  # <--- SET TO FALSE IF YOU JUST WANT TO UPDATE THE WEBSITE
+
+# 2. API KEYS & SECRETS
 VAPI_API_KEY = os.environ.get("VAPI_API_KEY")
 VAPI_ASSISTANT_ID = os.environ.get("VAPI_ASSISTANT_ID")
 VAPI_PHONE_NUMBER_ID = os.environ.get("VAPI_PHONE_NUMBER_ID")
-PHONE_NUMBERS_RAW = os.environ.get("MY_PHONE_NUMBER") # Comma separated list
+PHONE_NUMBERS_RAW = os.environ.get("MY_PHONE_NUMBER") 
 
 BASE_URL = "https://www.fiercebiotech.com"
 scraper = cloudscraper.create_scraper(browser='chrome')
@@ -55,26 +59,25 @@ def update_and_call_everyone(news_text):
     url_call = "https://api.vapi.ai/call"
     date_str = datetime.datetime.now().strftime("%B %d, %Y")
 
-    # --- THE "SLOW MODE" PROMPT ---
+    # --- PROMPT SETTINGS ---
     system_instruction = f"""
     You are 'BioRadio', a senior biotech news anchor. Today is {date_str}.
     
-    ### VOICE & STYLE GUIDELINES (CRITICAL):
-    1.  **PACING:** Speak SLOWLY. I repeat, speak SLOWLY.
-    2.  **PAUSING:** You MUST pause for 2 full seconds between headlines.
-    3.  **TONE:** Use a deep, serious, and authoritative tone (BBC News style).
-    4.  **NO FILLERS:** Do not say "Got it" or "Sure". Just read the news.
+    ### VOICE & STYLE GUIDELINES:
+    1.  **PACING:** Speak SLOWLY. Pause for 2 full seconds between headlines.
+    2.  **TONE:** Use a deep, serious, and authoritative tone.
+    3.  **NO FILLERS:** Do not say "Got it" or "Sure". Just read the news.
     
     ### INSTRUCTIONS:
-    1.  Start immediately with: "Good morning. This is your Fierce Biotech Daily Briefing."
-    2.  Read the headlines and details below using the pacing guidelines above.
+    1.  Start with: "Good morning. This is your Fierce Biotech Daily Briefing."
+    2.  Read the headlines and details below using the pacing guidelines.
     3.  If the call goes to voicemail or silence, HANG UP immediately.
 
     ### TODAY'S NEWS:
     {news_text}
     """
 
-    # 2. UPDATE THE BRAIN
+    # --- PART 1: UPDATE WEBSITE BRAIN ---
     payload_update = {
         "model": {
             "provider": "openai",
@@ -83,36 +86,37 @@ def update_and_call_everyone(news_text):
         }
     }
     
-    print("1. Updating Assistant Brain (Setting: Slow & Professional)...")
+    print("1. Updating Assistant Brain...")
     requests.patch(url_update, json=payload_update, headers={"Authorization": f"Bearer {VAPI_API_KEY}"})
-    print("✅ Brain Updated.")
+    print("✅ Brain Updated (Website is ready).")
 
-    # 3. CALL EVERYONE
-    if PHONE_NUMBERS_RAW and VAPI_PHONE_NUMBER_ID:
-        phone_list = [num.strip() for num in PHONE_NUMBERS_RAW.split(',') if num.strip()]
-        
-        print(f"2. Dialing {len(phone_list)} numbers...")
-        
-        for number in phone_list:
-            print(f"   📞 Dialing {number}...")
-            payload_call = {
-                "assistantId": VAPI_ASSISTANT_ID,
-                "phoneNumberId": VAPI_PHONE_NUMBER_ID,
-                "customer": { "number": number }
-            }
-            try:
-                resp = requests.post(url_call, json=payload_call, headers={"Authorization": f"Bearer {VAPI_API_KEY}"})
-                if resp.status_code == 201:
-                    print("      ✅ Ringing!")
-                else:
-                    print(f"      ❌ Failed: {resp.text}")
-            except Exception as e:
-                print(f"      ❌ Error: {e}")
+    # --- PART 2: MAKE CALLS (IF ENABLED) ---
+    if ENABLE_CALLS:
+        if PHONE_NUMBERS_RAW and VAPI_PHONE_NUMBER_ID:
+            phone_list = [num.strip() for num in PHONE_NUMBERS_RAW.split(',') if num.strip()]
+            print(f"2. Call Switch is ON. Dialing {len(phone_list)} numbers...")
             
-            time.sleep(2)
+            for number in phone_list:
+                print(f"   📞 Dialing {number}...")
+                payload_call = {
+                    "assistantId": VAPI_ASSISTANT_ID,
+                    "phoneNumberId": VAPI_PHONE_NUMBER_ID,
+                    "customer": { "number": number }
+                }
+                try:
+                    resp = requests.post(url_call, json=payload_call, headers={"Authorization": f"Bearer {VAPI_API_KEY}"})
+                    if resp.status_code == 201:
+                        print("      ✅ Ringing!")
+                    else:
+                        print(f"      ❌ Failed: {resp.text}")
+                except Exception as e:
+                    print(f"      ❌ Error: {e}")
+                time.sleep(2)
+        else:
+            print("⚠️ Call Switch is ON, but phone numbers are missing.")
     else:
-        print("⚠️ Skipping calls (Missing Numbers or ID)")
-        
+        print("🔕 Call Switch is OFF. Skipping calls.")
+
 if __name__ == "__main__":
     links = get_article_links()
     if links:
